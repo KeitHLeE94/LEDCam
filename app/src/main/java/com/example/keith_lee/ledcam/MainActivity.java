@@ -1,6 +1,7 @@
 package com.example.keith_lee.ledcam;
 
 import android.content.Intent;
+import android.hardware.Camera;
 import android.support.v7.app.AppCompatActivity;
 import android.os.Bundle;
 import android.view.View;
@@ -8,6 +9,7 @@ import android.view.WindowManager;
 import android.widget.Button;
 
 public class MainActivity extends AppCompatActivity {
+    Camera camera;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {

@@ -40,12 +40,22 @@ import java.io.File;
 import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
 import java.io.IOException;
+import java.util.ArrayList;
+import java.util.List;
+
+import static java.lang.Math.sqrt;
 
 public class CaptureActivity extends AppCompatActivity {
     private static final String TAG = "CaptureActivity";
     Preview preview;
     Camera camera;
     Context ctx;
+    double bDev = 0;
+    double gDev = 0;
+    double rDev = 0;
+    double bAvr;
+    double gAvr;
+    double rAvr;
 
     private final static int PERMISSIONS_REQUEST_CODE = 100;
     private final static int CAMERA_FACING = Camera.CameraInfo.CAMERA_FACING_BACK;
@@ -106,14 +116,15 @@ public class CaptureActivity extends AppCompatActivity {
         if(numCams > 0){
             try{
                 camera = Camera.open(CAMERA_FACING);
-
                 camera.setDisplayOrientation(setCameraDisplayOrientation(this, CAMERA_FACING, camera));
 
-
                 Camera.Parameters params = camera.getParameters();
+                params.setFlashMode(Camera.Parameters.FLASH_MODE_TORCH);
+                //params.setRotation(setCameraDisplayOrientation(this, CAMERA_FACING, camera));
+                camera.setParameters(params);
 
-                params.setRotation(setCameraDisplayOrientation(this, CAMERA_FACING, camera));
                 camera.startPreview();
+
             } catch(RuntimeException ex){
                 Toast.makeText(ctx, "camera_not_found " + ex.getMessage().toString(), Toast.LENGTH_LONG).show();
                 Log.d(TAG, "camera not found " + ex.getMessage().toString());
@@ -161,13 +172,6 @@ public class CaptureActivity extends AppCompatActivity {
         else{
             Toast.makeText(CaptureActivity.this, "Camera Not Supported", Toast.LENGTH_LONG).show();
         }
-
-        camera = Camera.open();
-
-        Camera.Parameters param = camera.getParameters();
-        param.setFlashMode(Camera.Parameters.FLASH_MODE_TORCH);
-        camera.setParameters(param);
-        camera.startPreview();
     }
 
     @Override
@@ -218,6 +222,7 @@ public class CaptureActivity extends AppCompatActivity {
         public void onPictureTaken(byte[] data, Camera camera) {
             int w = camera.getParameters().getPictureSize().width;
             int h = camera.getParameters().getPictureSize().height;
+            long bSum = 0, gSum = 0, rSum = 0;
 
             int orientation = setCameraDisplayOrientation(CaptureActivity.this, CAMERA_FACING, camera);
 
@@ -229,6 +234,39 @@ public class CaptureActivity extends AppCompatActivity {
             Matrix matrix = new Matrix();
             matrix.postRotate(orientation);
             bitmap = Bitmap.createBitmap(bitmap, 0, 0, w, h, matrix, true);
+
+            for(int i=0; i<1000; i++){
+                for(int j=0; j<500; j++){
+                    bSum += bitmap.getPixel(i, j) & 0x000000FF;
+                    gSum += (bitmap.getPixel(i, j) & 0x0000FF00) >> 8;
+                    rSum += (bitmap.getPixel(i, j) & 0x00FF0000) >> 16;
+                }
+            }
+
+            long numOfPixels = 1000 * 500;
+
+            //rgb값 평균
+            bAvr = bSum / numOfPixels;
+            gAvr = gSum / numOfPixels;
+            rAvr = rSum / numOfPixels;
+
+            //rgb값 표준편차
+            for(int i=0; i<1000; i++){
+                for(int j=0; j<500; j++){
+                    double bSquare = ((bitmap.getPixel(i, j) & 0x0000FF) * (bitmap.getPixel(i, j) & 0x0000FF)) - (bAvr * bAvr);
+                    bDev += bSquare / numOfPixels;
+                    double gSquare = (((bitmap.getPixel(i, j) & 0x0000FF00) >> 8) * ((bitmap.getPixel(i, j) & 0x0000FF00) >> 8)) - (gAvr * gAvr);
+                    gDev += gSquare / numOfPixels;
+                    double rSquare = (((bitmap.getPixel(i, j) & 0x00FF0000) >> 16) * ((bitmap.getPixel(i, j) & 0x00FF0000) >> 16)) - (rAvr * rAvr);
+                    rDev += rSquare / numOfPixels;
+                }
+            }
+
+            bDev = sqrt(bDev);
+            gDev = sqrt(gDev);
+            rDev = sqrt(rDev);
+
+            show();
 
             ByteArrayOutputStream stream = new ByteArrayOutputStream();
             bitmap.compress(Bitmap.CompressFormat.JPEG, 100, stream);
@@ -385,9 +423,21 @@ public class CaptureActivity extends AppCompatActivity {
         builder.create().show();
     }
 
-    @Override
-    protected void onDestroy(){
-        super.onDestroy();
-        camera.release();
+    void show()
+    {
+        final List<String> ListItems = new ArrayList<>();
+        ListItems.add("평균(R, G, B): " + "(" + rAvr + ", " + gAvr + ", " + bAvr + ")");
+        ListItems.add("표준 편차(R, G, B): " + "(" + rDev + ", " + gDev + ", " + bDev + ")");
+        final CharSequence[] items =  ListItems.toArray(new String[ ListItems.size()]);
+
+        AlertDialog.Builder builder = new AlertDialog.Builder(this);
+        builder.setTitle("RGB 분석 결과");
+        builder.setItems(items, new DialogInterface.OnClickListener() {
+            public void onClick(DialogInterface dialog, int pos) {
+                String selectedText = items[pos].toString();
+                Toast.makeText(CaptureActivity.this, selectedText, Toast.LENGTH_SHORT).show();
+            }
+        });
+        builder.show();
     }
 }
