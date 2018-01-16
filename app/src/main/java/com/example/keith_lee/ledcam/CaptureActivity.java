@@ -5,6 +5,7 @@ import android.annotation.TargetApi;
 import android.app.Activity;
 import android.app.AlarmManager;
 import android.app.AlertDialog;
+import android.app.Dialog;
 import android.app.PendingIntent;
 import android.content.Context;
 import android.content.DialogInterface;
@@ -12,7 +13,11 @@ import android.content.Intent;
 import android.content.pm.PackageManager;
 import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
+import android.graphics.Color;
 import android.graphics.Matrix;
+import android.graphics.Point;
+import android.graphics.Rect;
+import android.graphics.drawable.ColorDrawable;
 import android.hardware.Camera;
 import android.net.Uri;
 import android.os.AsyncTask;
@@ -20,6 +25,9 @@ import android.os.Build;
 import android.os.Environment;
 import android.provider.Settings;
 import android.support.annotation.NonNull;
+import android.support.annotation.RequiresApi;
+import android.support.design.widget.CoordinatorLayout;
+import android.support.design.widget.FloatingActionButton;
 import android.support.v4.app.ActivityCompat;
 import android.support.v4.content.ContextCompat;
 import android.support.v7.app.AppCompatActivity;
@@ -33,6 +41,7 @@ import android.view.Window;
 import android.widget.Button;
 import android.widget.FrameLayout;
 import android.widget.ImageButton;
+import android.widget.LinearLayout;
 import android.widget.Toast;
 
 import java.io.ByteArrayOutputStream;
@@ -53,9 +62,10 @@ public class CaptureActivity extends AppCompatActivity {
     double bDev = 0;
     double gDev = 0;
     double rDev = 0;
-    double bAvr;
-    double gAvr;
-    double rAvr;
+    float bAvr;
+    float gAvr;
+    float rAvr;
+    int exValue = 0;
 
     private final static int PERMISSIONS_REQUEST_CODE = 100;
     private final static int CAMERA_FACING = Camera.CameraInfo.CAMERA_FACING_BACK;
@@ -104,6 +114,21 @@ public class CaptureActivity extends AppCompatActivity {
             preview.setLayoutParams(new WindowManager.LayoutParams(WindowManager.LayoutParams.MATCH_PARENT, WindowManager.LayoutParams.MATCH_PARENT));
             ((FrameLayout) findViewById(R.id.layout)).addView(preview);
             preview.setKeepScreenOn(true);
+            preview.setOnClickListener(new View.OnClickListener(){
+                @Override
+                public void onClick(View v){
+                    camera.autoFocus(new Camera.AutoFocusCallback() {
+                        public void onAutoFocus(boolean success, Camera camera) {
+                            if(success){
+                               Toast.makeText(getApplicationContext(), "Focus Adjusted", Toast.LENGTH_SHORT).show();
+                            }
+                            else{
+                                Toast.makeText(getApplicationContext(), "Focus Adjust Failed", Toast.LENGTH_SHORT).show();
+                            }
+                        }
+                    });
+                }
+            });
         }
 
         preview.setCamera(null);
@@ -145,11 +170,45 @@ public class CaptureActivity extends AppCompatActivity {
         getWindow().setFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON, WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
         setContentView(R.layout.activity_capture);
 
-        ImageButton button = (ImageButton) findViewById(R.id.btnCapture);
-        button.setOnClickListener(new View.OnClickListener(){
+        ImageButton capButton = (ImageButton) findViewById(R.id.btnCapture);
+        capButton.setOnClickListener(new View.OnClickListener(){
             @Override
             public void onClick(View v){
                 camera.takePicture(shutterCallback, rawCallback, jpegCallback);
+            }
+        });
+
+        ImageButton subButton = (ImageButton) findViewById(R.id.btnSub);
+        subButton.setOnClickListener(new View.OnClickListener(){
+            @Override
+            public void onClick(View v){
+                Camera.Parameters params = camera.getParameters();
+                if(exValue < params.getMinExposureCompensation()){
+                    Toast.makeText(CaptureActivity.this, "Reached Minimum Exposure Rate: " + params.getMinExposureCompensation() + ". Reset to Zero", Toast.LENGTH_LONG).show();
+                    exValue = 0;
+                    params.setExposureCompensation(exValue);
+                }
+                else{
+                    params.setExposureCompensation(exValue--);
+                    camera.setParameters(params);
+                }
+            }
+        });
+
+        ImageButton addButton = (ImageButton) findViewById(R.id.btnAdd);
+        addButton.setOnClickListener(new View.OnClickListener(){
+            @Override
+            public void onClick(View v){
+                Camera.Parameters params = camera.getParameters();
+                if(exValue > params.getMaxExposureCompensation()){
+                    Toast.makeText(CaptureActivity.this, "Reached Maximum Exposure Rate: " + params.getMaxExposureCompensation() + ". Reset to Zero", Toast.LENGTH_LONG).show();
+                    exValue = 0;
+                    params.setExposureCompensation(exValue);
+                }
+                else{
+                    params.setExposureCompensation(exValue++);
+                    camera.setParameters(params);
+                }
             }
         });
 
@@ -236,14 +295,14 @@ public class CaptureActivity extends AppCompatActivity {
             bitmap = Bitmap.createBitmap(bitmap, 0, 0, w, h, matrix, true);
 
             for(int i=0; i<1000; i++){
-                for(int j=0; j<500; j++){
+                for(int j=0; j<1000; j++){
                     bSum += bitmap.getPixel(i, j) & 0x000000FF;
                     gSum += (bitmap.getPixel(i, j) & 0x0000FF00) >> 8;
                     rSum += (bitmap.getPixel(i, j) & 0x00FF0000) >> 16;
                 }
             }
 
-            long numOfPixels = 1000 * 500;
+            long numOfPixels = 1000 * 1000;
 
             //rgb값 평균
             bAvr = bSum / numOfPixels;
@@ -252,7 +311,7 @@ public class CaptureActivity extends AppCompatActivity {
 
             //rgb값 표준편차
             for(int i=0; i<1000; i++){
-                for(int j=0; j<500; j++){
+                for(int j=0; j<1000; j++){
                     double bSquare = ((bitmap.getPixel(i, j) & 0x0000FF) * (bitmap.getPixel(i, j) & 0x0000FF)) - (bAvr * bAvr);
                     bDev += bSquare / numOfPixels;
                     double gSquare = (((bitmap.getPixel(i, j) & 0x0000FF00) >> 8) * ((bitmap.getPixel(i, j) & 0x0000FF00) >> 8)) - (gAvr * gAvr);
