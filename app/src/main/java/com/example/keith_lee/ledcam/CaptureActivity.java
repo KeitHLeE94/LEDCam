@@ -33,6 +33,7 @@ import android.support.v4.content.ContextCompat;
 import android.support.v7.app.AppCompatActivity;
 import android.os.Bundle;
 import android.util.Log;
+import android.view.LayoutInflater;
 import android.view.Surface;
 import android.view.SurfaceView;
 import android.view.View;
@@ -41,7 +42,9 @@ import android.view.Window;
 import android.widget.Button;
 import android.widget.FrameLayout;
 import android.widget.ImageButton;
+import android.widget.ImageView;
 import android.widget.LinearLayout;
+import android.widget.TextView;
 import android.widget.Toast;
 
 import java.io.ByteArrayOutputStream;
@@ -484,19 +487,31 @@ public class CaptureActivity extends AppCompatActivity {
 
     void show()
     {
-        final List<String> ListItems = new ArrayList<>();
+        /*final List<String> ListItems = new ArrayList<>();
         ListItems.add("평균(R, G, B): " + "(" + rAvr + ", " + gAvr + ", " + bAvr + ")");
         ListItems.add("표준 편차(R, G, B): " + "(" + rDev + ", " + gDev + ", " + bDev + ")");
-        final CharSequence[] items =  ListItems.toArray(new String[ ListItems.size()]);
+        final CharSequence[] items =  ListItems.toArray(new String[ ListItems.size()]);*/
 
+        LayoutInflater inflater = (LayoutInflater) getApplicationContext().getSystemService(LAYOUT_INFLATER_SERVICE);
+        View view = inflater.inflate(R.layout.custom_dialog, null);
+        TextView text = (TextView) view.findViewById(R.id.text);
+        text.setText("평균(R, G, B): " + "(" + rAvr + ", " + gAvr + ", " + bAvr + ")" + "\r\n" + "표준 편차(R, G, B) : " + "(" + rDev + ", " + gDev + ", " + bDev + ")");
+        ImageView image = (ImageView) view.findViewById(R.id.image);
+        image.setImageDrawable(new ColorDrawable(Color.rgb((int)rAvr, (int)gAvr, (int)bAvr)));
         AlertDialog.Builder builder = new AlertDialog.Builder(this);
+        builder.setView(view);
+        builder.setTitle("RGB 분석 결과");
+        AlertDialog dialog = builder.create();
+        dialog.show();
+
+        /*AlertDialog.Builder builder = new AlertDialog.Builder(this);
         builder.setTitle("RGB 분석 결과");
         builder.setItems(items, new DialogInterface.OnClickListener() {
             public void onClick(DialogInterface dialog, int pos) {
                 String selectedText = items[pos].toString();
                 Toast.makeText(CaptureActivity.this, selectedText, Toast.LENGTH_SHORT).show();
             }
-        });
-        builder.show();
+        });*/
+        //builder.show();
     }
 }
